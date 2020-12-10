@@ -1,67 +1,58 @@
 import { BigInt } from "@graphprotocol/graph-ts"
 import {
-  RenderToken,
-  DisbursalAddressUpdate,
-  JobBalanceUpdate,
-  RenderTokenAddressUpdate,
-  OwnershipTransferred,
-  Migrated
+    RenderToken,
+    JobBalanceUpdate,
+    DisburseJobCall
 } from "../generated/RenderToken/RenderToken"
-import { ExampleEntity } from "../generated/schema"
+import { Job, Worker, WorkerJob } from "../generated/schema"
 
-export function handleDisbursalAddressUpdate(
-  event: DisbursalAddressUpdate
-): void {
-  // Entities can be loaded from the store using a string ID; this ID
-  // needs to be unique across all entities of the same type
-  let entity = ExampleEntity.load(event.transaction.from.toHex())
+export function handleJobBalanceUpdate(event: JobBalanceUpdate): void {
+    let entity = Job.load(event.params._jobId)
+    
+    if (entity == null) {
+	entity = new Job(event.params._jobId)
+	entity.paid = BigInt.fromI32(0)
+	entity.funded = BigInt.fromI32(0)
+    }
 
-  // Entities only exist after they have been saved to the store;
-  // `null` checks allow to create entities on demand
-  if (entity == null) {
-    entity = new ExampleEntity(event.transaction.from.toHex())
-
-    // Entity fields can be set using simple assignments
-    entity.count = BigInt.fromI32(0)
-  }
-
-  // BigInt and BigDecimal math are supported
-  entity.count = entity.count + BigInt.fromI32(1)
-
-  // Entity fields can be set based on event parameters
-  entity.disbursalAddress = event.params.disbursalAddress
-
-  // Entities can be written to the store with `.save()`
-  entity.save()
-
-  // Note: If a handler doesn't require existing field values, it is faster
-  // _not_ to load the entity from the store. Instead, create it fresh with
-  // `new Entity(...)`, set the fields that should be updated and save the
-  // entity back to the store. Fields that were not set or unset remain
-  // unchanged, allowing for partial updates to be applied.
-
-  // It is also possible to access smart contracts from mappings. For
-  // example, the contract that has emitted the event can be connected to
-  // with:
-  //
-  // let contract = Contract.bind(event.address)
-  //
-  // The following functions can then be called on this contract to access
-  // state variables and other data:
-  //
-  // - contract.jobBalance(...)
-  // - contract.disbursalAddress(...)
-  // - contract.owner(...)
-  // - contract.isMigrated(...)
-  // - contract.renderTokenAddress(...)
+    let balance = entity.funded - entity.paid
+    
+    if (event.params._balance > balance) {
+	entity.funded += event.params._balance - balance
+    } else {
+	entity.paid += balance - event.params._balance;
+    }
+    
+    entity.save()
 }
 
-export function handleJobBalanceUpdate(event: JobBalanceUpdate): void {}
+export function handleDisburseJob(call: DisburseJobCall): void {
+    let job = Job.load(call.inputs._jobId)
 
-export function handleRenderTokenAddressUpdate(
-  event: RenderTokenAddressUpdate
-): void {}
+    let recipients = call.inputs._recipients
+    let amounts = call.inputs._amounts
 
-export function handleOwnershipTransferred(event: OwnershipTransferred): void {}
+    for (let i = 0; i < recipients.length; i++) {
+	let worker = Worker.load(recipients[i].toHex())
+	
+	if (worker == null) {
+	    worker = new Worker(recipients[i].toHex())
+	    worker.earned = BigInt.fromI32(0)
+	}
 
-export function handleMigrated(event: Migrated): void {}
+	let workerjob = WorkerJob.load(`${worker.id}-${job.id}`)
+
+	if (workerjob == null) {
+	    workerjob = new WorkerJob(`${worker.id}-${job.id}`)
+	    workerjob.job = job.id
+	    workerjob.worker = worker.id
+	    workerjob.paid = BigInt.fromI32(0)
+	}
+
+	worker.earned += amounts[i]
+	workerjob.paid += amounts[i]
+
+	worker.save()
+	workerjob.save()
+    }
+}

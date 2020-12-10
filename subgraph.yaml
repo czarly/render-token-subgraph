@@ -1,4 +1,4 @@
-specVersion: 0.0.1
+specVersion: 0.0.2
 schema:
   file: ./schema.graphql
 dataSources:
@@ -10,7 +10,7 @@ dataSources:
       abi: RenderToken
     mapping:
       kind: ethereum/events
-      apiVersion: 0.0.2
+      apiVersion: 0.0.4
       language: wasm/assemblyscript
       entities:
         - DisbursalAddressUpdate
@@ -22,14 +22,9 @@ dataSources:
         - name: RenderToken
           file: ./abis/RenderToken.json
       eventHandlers:
-        - event: DisbursalAddressUpdate(address)
-          handler: handleDisbursalAddressUpdate
         - event: JobBalanceUpdate(string,uint256)
           handler: handleJobBalanceUpdate
-        - event: RenderTokenAddressUpdate(address)
-          handler: handleRenderTokenAddressUpdate
-        - event: OwnershipTransferred(indexed address,indexed address)
-          handler: handleOwnershipTransferred
-        - event: Migrated(string,string)
-          handler: handleMigrated
+      callHandlers:
+        - function: disburseJob(string,address[],uint256[])
+          handler: handleDisburseJob
       file: ./src/mapping.ts

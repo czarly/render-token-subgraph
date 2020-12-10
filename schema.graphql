@@ -1,5 +1,20 @@
-type ExampleEntity @entity {
+type Job @entity {
   id: ID!
-  count: BigInt!
-  disbursalAddress: Bytes! # address
+  funded: BigInt!
+  paid: BigInt!
+  workers: [WorkerJob!] @derivedFrom(field: "job")
+}
+
+type Worker @entity {
+  id: ID!
+  address: Bytes!
+  earned: BigInt!
+  jobs: [WorkerJob!] @derivedFrom(field: "worker")
+}
+
+type WorkerJob @entity {
+  id: ID! # Set to `${worker.id}-${job.id}`
+  worker: Worker!
+  job: Job!
+  paid: BigInt!
 }
